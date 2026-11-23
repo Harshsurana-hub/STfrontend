@@ -77,66 +77,79 @@ type PricingTiersProps = {
 
 export function PricingTiers({ onSelectTier }: PricingTiersProps) {
   return (
-    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-      {TIERS.map((tier) => (
-        <div
-          key={tier.id}
-          className={cn(
-            'relative flex flex-col justify-between rounded-3xl border bg-white p-8 shadow-sm transition-all duration-300 hover:shadow-md',
-            tier.popular
-              ? 'border-[#7F77DD] ring-2 ring-[#7F77DD]/20'
-              : 'border-[#D5D2F6]'
-          )}
-        >
-          {tier.badge ? (
-            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-[#7F77DD] px-3.5 py-1 text-xs font-semibold text-white shadow-sm">
-              {tier.badge}
-            </span>
-          ) : null}
-
-          <div>
-            <h3 className="text-xl font-bold text-[#26215C]">{tier.name}</h3>
-            <p className="mt-2 text-sm text-[#5A5578]">{tier.tagline}</p>
-
-            <div className="my-6 flex items-baseline gap-1">
-              <span className="font-display text-4xl font-extrabold text-[#26215C]">
-                {tier.price}
-              </span>
-              <span className="text-sm font-medium text-[#5A5578]">
-                {tier.period}
-              </span>
-            </div>
-
-            <div className="mb-6 inline-block rounded-full bg-[#F4F2FF] px-3 py-1 text-xs font-semibold text-[#26215C]">
-              {tier.teamSize}
-            </div>
-
-            <ul className="space-y-3 border-t border-[#EEEDFE] pt-6">
-              {tier.features.map((feature) => (
-                <li key={feature} className="flex items-start gap-3 text-sm text-[#26215C]">
-                  <Check className="h-5 w-5 shrink-0 text-[#7F77DD]" aria-hidden="true" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="mt-8 pt-4">
-            <button
-              type="button"
-              onClick={() => onSelectTier?.(tier.name)}
+    <section aria-labelledby="pricing-tiers-heading">
+      <h2 id="pricing-tiers-heading" className="sr-only">
+        Pricing Tiers
+      </h2>
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        {TIERS.map((tier) => {
+          const badgeId = tier.badge ? `tier-badge-${tier.id}` : undefined;
+          return (
+            <div
+              key={tier.id}
+              aria-describedby={badgeId}
               className={cn(
-                'w-full rounded-xl py-3 text-center text-sm font-semibold transition duration-200',
+                'relative flex flex-col justify-between rounded-3xl border bg-white p-8 shadow-sm transition-all duration-300 hover:shadow-md',
                 tier.popular
-                  ? 'bg-[#7F77DD] text-white hover:bg-[#6860C7] shadow-sm'
-                  : 'border border-[#7F77DD] bg-white text-[#26215C] hover:bg-[#F4F2FF]'
+                  ? 'border-[#7F77DD] ring-2 ring-[#7F77DD]/20'
+                  : 'border-[#D5D2F6]'
               )}
             >
-              {tier.ctaLabel}
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
+              {tier.badge ? (
+                <span
+                  id={badgeId}
+                  className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-[#7F77DD] px-3.5 py-1 text-xs font-semibold text-white shadow-sm"
+                >
+                  {tier.badge}
+                </span>
+              ) : null}
+
+              <div>
+                <h3 className="text-xl font-bold text-[#26215C]">{tier.name}</h3>
+                <p className="mt-2 text-sm text-[#5A5578]">{tier.tagline}</p>
+
+                <div className="my-6 flex items-baseline gap-1">
+                  <span className="font-display text-4xl font-extrabold text-[#26215C]">
+                    {tier.price}
+                  </span>
+                  <span className="text-sm font-medium text-[#5A5578]">
+                    {tier.period}
+                  </span>
+                </div>
+
+                <div className="mb-6 inline-block rounded-full bg-[#F4F2FF] px-3 py-1 text-xs font-semibold text-[#26215C]">
+                  {tier.teamSize}
+                </div>
+
+                <ul className="space-y-3 border-t border-[#EEEDFE] pt-6">
+                  {tier.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-3 text-sm text-[#26215C]">
+                      <Check className="h-5 w-5 shrink-0 text-[#7F77DD]" aria-hidden="true" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="mt-8 pt-4">
+                <button
+                  type="button"
+                  aria-label={`${tier.ctaLabel} for ${tier.name}`}
+                  onClick={() => onSelectTier?.(tier.name)}
+                  className={cn(
+                    'w-full rounded-xl py-3 text-center text-sm font-semibold transition duration-200',
+                    tier.popular
+                      ? 'bg-[#7F77DD] text-white hover:bg-[#6860C7] shadow-sm'
+                      : 'border border-[#7F77DD] bg-white text-[#26215C] hover:bg-[#F4F2FF]'
+                  )}
+                >
+                  {tier.ctaLabel}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
