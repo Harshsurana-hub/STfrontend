@@ -1,38 +1,41 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Bell, CheckCheck, Loader2 } from 'lucide-react';
-import { notificationsApi } from '@/lib/api/services';
-import { timeAgo } from '@/lib/utils';
-import type { Notification } from '@/types';
+import { useEffect, useState } from "react";
+import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { notificationsApi } from "@/lib/api/services";
+import { timeAgo } from "@/lib/utils";
+import type { Notification } from "@/types";
 
 const TYPE_COLORS: Record<string, string> = {
-  COURSE_APPROVED:      'bg-leaf-50 text-leaf-700',
-  COURSE_REJECTED:      'bg-red-50 text-red-700',
-  ENROLLMENT_CONFIRMED: 'bg-saffron-50 text-saffron-700',
-  COURSE_COMPLETED:     'bg-leaf-50 text-leaf-700',
-  CERTIFICATE_ISSUED:   'bg-saffron-50 text-saffron-700',
-  ASSIGNMENT_APPROVED:  'bg-leaf-50 text-leaf-700',
-  ASSIGNMENT_REJECTED:  'bg-red-50 text-red-700',
-  ASSIGNMENT_SUBMITTED: 'bg-blue-50 text-blue-700',
-  PAYMENT_RECEIVED:     'bg-leaf-50 text-leaf-700',
-  NEW_ENROLLMENT:       'bg-saffron-50 text-saffron-700',
-  COURSE_ANNOUNCEMENT:  'bg-blue-50 text-blue-700',
+  COURSE_APPROVED: "bg-leaf-50 text-leaf-700",
+  COURSE_REJECTED: "bg-red-50 text-red-700",
+  ENROLLMENT_CONFIRMED: "bg-saffron-50 text-saffron-700",
+  COURSE_COMPLETED: "bg-leaf-50 text-leaf-700",
+  CERTIFICATE_ISSUED: "bg-saffron-50 text-saffron-700",
+  ASSIGNMENT_APPROVED: "bg-leaf-50 text-leaf-700",
+  ASSIGNMENT_REJECTED: "bg-red-50 text-red-700",
+  ASSIGNMENT_SUBMITTED: "bg-blue-50 text-blue-700",
+  PAYMENT_RECEIVED: "bg-leaf-50 text-leaf-700",
+  NEW_ENROLLMENT: "bg-saffron-50 text-saffron-700",
+  COURSE_ANNOUNCEMENT: "bg-blue-50 text-blue-700",
 };
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading,       setLoading]       = useState(true);
+  const [loading, setLoading] = useState(true);
 
   const load = () => {
     setLoading(true);
-    notificationsApi.list()
+    notificationsApi
+      .list()
       .then((r) => setNotifications(r.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const handleMarkAllRead = async () => {
     await notificationsApi.markAllRead();
@@ -42,7 +45,7 @@ export default function NotificationsPage() {
   const handleMarkRead = async (id: string) => {
     await notificationsApi.markRead(id);
     setNotifications((prev) =>
-      prev.map((n) => n.id === id ? { ...n, read: true } : n),
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
     );
   };
 
@@ -54,7 +57,7 @@ export default function NotificationsPage() {
         <div>
           <h1 className="section-heading">Notifications</h1>
           <p className="text-sm text-ink-500 mt-0.5">
-            {unread > 0 ? `${unread} unread` : 'All caught up'}
+            {unread > 0 ? `${unread} unread` : "All caught up"}
           </p>
         </div>
         {unread > 0 && (
@@ -75,34 +78,49 @@ export default function NotificationsPage() {
           <p className="text-sm text-ink-500">No notifications yet</p>
         </div>
       ) : (
-        <div className="card divide-y divide-ink-50">
+        <ul aria-label="Notifications" className="card divide-y divide-ink-50">
           {notifications.map((n) => (
-            <button
-              type="button"
-              key={n.id}
-              onClick={() => !n.read && handleMarkRead(n.id)}
-              className={`w-full p-4 flex items-start gap-3 text-left transition-colors ${
-                n.read ? 'opacity-60' : 'cursor-pointer hover:bg-ink-50'
-              }`}
-            >
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${
-                n.read ? 'bg-ink-200' : 'bg-saffron-500'
-              }`} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2 mb-0.5">
-                  <p className="text-sm font-medium text-ink-900">{n.title}</p>
-                  <span className={`badge text-[10px] flex-shrink-0 ${
-                    TYPE_COLORS[n.type] ?? 'bg-ink-100 text-ink-600'
-                  }`}>
-                    {n.type === 'COURSE_ANNOUNCEMENT' ? 'announcement' : n.type.replace(/_/g, ' ').toLowerCase()}
-                  </span>
+            <li key={n.id}>
+              <button
+                type="button"
+                aria-label={`${n.read ? "Read" : "Unread"} notification: ${n.title}`}
+                onClick={() => !n.read && handleMarkRead(n.id)}
+                className={`w-full p-4 flex items-start gap-3 text-left transition-colors ${
+                  n.read ? "opacity-60" : "cursor-pointer hover:bg-ink-50"
+                }`}
+              >
+                <div
+                  aria-hidden="true"
+                  className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${
+                    n.read ? "bg-ink-200" : "bg-saffron-500"
+                  }`}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2 mb-0.5">
+                    <p className="text-sm font-medium text-ink-900">
+                      {n.title}
+                    </p>
+                    <span
+                      className={`badge text-[10px] flex-shrink-0 ${
+                        TYPE_COLORS[n.type] ?? "bg-ink-100 text-ink-600"
+                      }`}
+                    >
+                      {n.type === "COURSE_ANNOUNCEMENT"
+                        ? "announcement"
+                        : n.type.replace(/_/g, " ").toLowerCase()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-500 leading-relaxed">
+                    {n.message}
+                  </p>
+                  <p className="text-[10px] text-ink-400 mt-1">
+                    {timeAgo(n.createdAt)}
+                  </p>
                 </div>
-                <p className="text-xs text-ink-500 leading-relaxed">{n.message}</p>
-                <p className="text-[10px] text-ink-400 mt-1">{timeAgo(n.createdAt)}</p>
-              </div>
-            </button>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
