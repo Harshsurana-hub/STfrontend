@@ -10,7 +10,7 @@ This document tracks the implementation of four improvements for the STfrontend 
 ## Implementation Timeline
 Started: 2026-11-23
 Workflow ID: wf_38d1a951115c7fa3
-Branch: accessibility-fixes-124-127
+Branch: fixes-106-109
 Repository: https://github.com/Kabukabs/STfrontend.git
 Completed: [To be recorded]
 
@@ -133,7 +133,7 @@ The implementation is being handled by an autonomous workflow that will:
 
 ## Notes and Decisions
 - Using workflow-based approach for systematic implementation
-- All changes will be on branch: `accessibility-fixes-124-127`
+- All changes will be on branch: `fixes-106-109`
 - Each issue will be implemented following the repository's existing patterns
 - Tests will be added/updated for each change using Vitest
 - Documentation will be updated where behavior changes
