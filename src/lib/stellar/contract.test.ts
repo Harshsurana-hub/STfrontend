@@ -1,112 +1,68 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Keypair, SorobanRpc as ActualSorobanRpc } from '@stellar/stellar-sdk';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const rpc = vi.hoisted(() => ({
+const { getAccount, signTx } = vi.hoisted(() => ({
   getAccount: vi.fn(),
-  simulateTransaction: vi.fn(),
-  sendTransaction: vi.fn(),
-  getTransaction: vi.fn(),
+  signTx: vi.fn(),
 }));
 
-vi.mock('./freighter', () => ({ signTx: vi.fn().mockResolvedValue('signed-xdr') }));
+vi.mock('./freighter', () => ({ signTx }));
 
-// Stub only the network/transaction plumbing; Address and nativeToScVal stay real.
 vi.mock('@stellar/stellar-sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@stellar/stellar-sdk')>();
-  class Server {
-    getAccount = rpc.getAccount;
-    simulateTransaction = rpc.simulateTransaction;
-    sendTransaction = rpc.sendTransaction;
-    getTransaction = rpc.getTransaction;
+  class MockServer {
+    getAccount = getAccount;
   }
-  class TransactionBuilder {
-    addOperation() { return this; }
-    setTimeout() { return this; }
-    build() { return {}; }
-  }
-  class Contract {
-    call() { return {}; }
-  }
-  class Transaction {}
   return {
     ...actual,
-    Contract,
-    TransactionBuilder,
-    Transaction,
-    SorobanRpc: {
-      ...actual.SorobanRpc,
-      Server,
-      Api: { ...actual.SorobanRpc.Api, isSimulationError: () => false },
-      assembleTransaction: () => ({ build: () => ({ toXDR: () => 'assembled-xdr' }) }),
-    },
+    SorobanRpc: { ...actual.SorobanRpc, Server: MockServer },
   };
 });
 
-import { enrollInCourse, stellarExplorerTxUrl, TransactionPendingError } from './contract';
+import { enrollInCourse, registerCourseOnChain } from './contract';
 
-const { GetTransactionStatus } = ActualSorobanRpc.Api;
-const HASH = 'a'.repeat(64);
+const VALID_TOKEN = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
 
-const enroll = () =>
-  enrollInCourse({ callerAddress: Keypair.random().publicKey(), courseId: 'course-1' });
-
-describe('enrollInCourse confirmation outcomes', () => {
+describe('contract address validation', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    Object.values(rpc).forEach((fn) => fn.mockReset());
-    rpc.getAccount.mockResolvedValue({});
-    rpc.simulateTransaction.mockResolvedValue({});
-    rpc.sendTransaction.mockResolvedValue({ status: 'PENDING', hash: HASH });
+    getAccount.mockReset();
+    signTx.mockReset();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  it.each(['', 'not-an-address', 'GABC', VALID_TOKEN])(
+    'enrollInCourse rejects invalid callerAddress %j without RPC or signing',
+    async (callerAddress) => {
+      await expect(enrollInCourse({ callerAddress, courseId: 'course-1' })).rejects.toThrow(
+        'Invalid Stellar address for callerAddress',
+      );
+      expect(getAccount).not.toHaveBeenCalled();
+      expect(signTx).not.toHaveBeenCalled();
+    },
+  );
+
+  it('registerCourseOnChain rejects invalid callerAddress without RPC or signing', async () => {
+    await expect(
+      registerCourseOnChain({
+        callerAddress: 'bad',
+        courseId: 'course-1',
+        price: 100n,
+        tokenAddress: VALID_TOKEN,
+      }),
+    ).rejects.toThrow('Invalid Stellar address for callerAddress');
+    expect(getAccount).not.toHaveBeenCalled();
+    expect(signTx).not.toHaveBeenCalled();
   });
 
-  it('rejects with a TransactionPendingError carrying the hash when confirmation times out', async () => {
-    rpc.getTransaction.mockResolvedValue({ status: GetTransactionStatus.NOT_FOUND });
-
-    const result = enroll().catch((error: unknown) => error);
-    await vi.advanceTimersByTimeAsync(20 * 2000);
-    const error = await result;
-
-    expect(error).toBeInstanceOf(TransactionPendingError);
-    expect(error).toBeInstanceOf(Error);
-    expect((error as TransactionPendingError).message).toBe('Transaction not confirmed');
-    expect((error as TransactionPendingError).hash).toBe(HASH);
-  });
-
-  it('keeps the on-chain failure message unchanged', async () => {
-    rpc.getTransaction.mockResolvedValue({ status: GetTransactionStatus.FAILED });
-
-    const result = enroll().catch((error: unknown) => error);
-    await vi.advanceTimersByTimeAsync(2000);
-    const error = await result;
-
-    expect(error).not.toBeInstanceOf(TransactionPendingError);
-    expect((error as Error).message).toBe(`Transaction failed: ${HASH}`);
-  });
-
-  it('keeps the submission failure message unchanged', async () => {
-    rpc.sendTransaction.mockResolvedValue({ status: 'ERROR', hash: HASH });
-
-    await expect(enroll()).rejects.toThrow('Submission failed');
-  });
-
-  it('resolves with the hash once the transaction succeeds', async () => {
-    rpc.getTransaction.mockResolvedValue({ status: GetTransactionStatus.SUCCESS });
-
-    const result = enroll();
-    await vi.advanceTimersByTimeAsync(2000);
-
-    await expect(result).resolves.toBe(HASH);
-  });
-});
-
-describe('stellarExplorerTxUrl', () => {
-  it('links to the transaction on Stellar Expert', () => {
-    expect(stellarExplorerTxUrl(HASH)).toMatch(
-      new RegExp(`^https://stellar\\.expert/explorer/(testnet|public)/tx/${HASH}$`),
-    );
+  it('registerCourseOnChain rejects invalid tokenAddress without RPC or signing', async () => {
+    const { Keypair } = await import('@stellar/stellar-sdk');
+    await expect(
+      registerCourseOnChain({
+        callerAddress: Keypair.random().publicKey(),
+        courseId: 'course-1',
+        price: 100n,
+        tokenAddress: 'not-a-token',
+      }),
+    ).rejects.toThrow('Invalid Stellar address for tokenAddress');
+    expect(getAccount).not.toHaveBeenCalled();
+    expect(signTx).not.toHaveBeenCalled();
   });
 });

@@ -7,7 +7,7 @@
 
 import {
   Networks, SorobanRpc, Contract, TransactionBuilder,
-  BASE_FEE, nativeToScVal, xdr, Address,
+  BASE_FEE, nativeToScVal, xdr, Address, StrKey,
 } from '@stellar/stellar-sdk';
 import { signTx } from './freighter';
 
@@ -41,6 +41,23 @@ export function stellarExplorerTxUrl(hash: string): string {
 
 let _rpc: SorobanRpc.Server;
 const getRpc = () => (_rpc ??= new SorobanRpc.Server(RPC_URL, { allowHttp: true }));
+
+/** Throws `Invalid Stellar address for <field>` unless `value` is a valid account (G...) address. */
+function assertValidAddress(value: string, field: string): void {
+  if (typeof value !== 'string' || !StrKey.isValidEd25519PublicKey(value)) {
+    throw new Error(`Invalid Stellar address for ${field}`);
+  }
+}
+
+/** Like `assertValidAddress`, but also accepts a contract (C...) address, e.g. a token contract. */
+function assertValidTokenAddress(value: string, field: string): void {
+  if (
+    typeof value !== 'string' ||
+    !(StrKey.isValidEd25519PublicKey(value) || StrKey.isValidContract(value))
+  ) {
+    throw new Error(`Invalid Stellar address for ${field}`);
+  }
+}
 
 async function invokeContract(caller: string, method: string, args: xdr.ScVal[]): Promise<string> {
   const rpc      = getRpc();
@@ -92,12 +109,14 @@ async function waitForTx(hash: string): Promise<string> {
  *   before retrying, or the learner could be charged twice.
  *
  * Errors from the wallet (for example the user declining to sign) and from RPC requests
- * propagate unchanged. Throws if `callerAddress` is not a valid Stellar address.
+ * propagate unchanged. Rejects with `Invalid Stellar address for callerAddress` before any
+ * RPC request or signing if `callerAddress` is not a valid Stellar address.
  */
 export async function enrollInCourse(params: {
   callerAddress: string;
   courseId: string;
 }): Promise<string> {
+  assertValidAddress(params.callerAddress, 'callerAddress');
   return invokeContract(params.callerAddress, 'enroll', [
     new Address(params.callerAddress).toScVal(),
     nativeToScVal(params.courseId, { type: 'string' }),
@@ -117,6 +136,8 @@ export async function registerCourseOnChain(params: {
   tokenAddress: string;
   platformFeePct?: number;
 }): Promise<string> {
+  assertValidAddress(params.callerAddress, 'callerAddress');
+  assertValidTokenAddress(params.tokenAddress, 'tokenAddress');
   return invokeContract(params.callerAddress, 'register_course', [
     new Address(params.callerAddress).toScVal(),
     nativeToScVal(params.courseId, { type: 'string' }),

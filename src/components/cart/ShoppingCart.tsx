@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ShoppingBag, X, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useCartStore } from '@/lib/hooks/use-cart-store';
 import { promoCodesApi } from '@/lib/api/services';
 import { Button } from '@/components/ui/Button';
 import { formatUsdc } from '@/lib/utils';
+import { computePromoDiscount } from '@/lib/utils/promo';
 import { CheckoutErrorBoundary } from './CheckoutErrorBoundary';
 
 interface ShoppingCartProps {
@@ -23,18 +24,54 @@ function ShoppingCartContent({ isOpen = true, onClose }: ShoppingCartProps) {
     code: string;
     discountType: 'PERCENTAGE' | 'FIXED';
     discountValue: number;
+    /** The course the code was validated against; the discount only applies to it. */
+    courseId: string;
   } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
 
   const totalPrice = getTotalPrice();
   const itemCount = items.length;
-  const discountAmount = appliedPromo
-    ? appliedPromo.discountType === 'PERCENTAGE'
-      ? (totalPrice * appliedPromo.discountValue) / 100
-      : appliedPromo.discountValue
-    : 0;
+  const promoCourse = appliedPromo
+    ? items.find((item) => item.courseId === appliedPromo.courseId)
+    : undefined;
+  const discountAmount = computePromoDiscount(appliedPromo, promoCourse?.course.price ?? 0);
   const finalPrice = Math.max(0, totalPrice - discountAmount);
+
+  // Cart contents the applied promo was last validated against.
+  const itemIdsKey = items.map((item) => item.courseId).join('|');
+  const validatedItemsKey = useRef<string | null>(null);
+
+  // Re-check the applied promo whenever the cart contents change.
+  useEffect(() => {
+    if (!appliedPromo || validatedItemsKey.current === itemIdsKey) return;
+    validatedItemsKey.current = itemIdsKey;
+
+    const { code, courseId } = appliedPromo;
+    if (!itemIdsKey.split('|').includes(courseId)) {
+      setAppliedPromo(null);
+      setPromoError(
+        `Promo code ${code} was removed because the course it applied to is no longer in your cart.`,
+      );
+      return;
+    }
+
+    let cancelled = false;
+    promoCodesApi
+      .validate(code, courseId)
+      .then((result) => {
+        if (!cancelled) setAppliedPromo({ ...result, courseId });
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const reason = error instanceof Error ? error.message : 'Invalid promo code';
+        setAppliedPromo(null);
+        setPromoError(`Promo code ${code} no longer applies to your cart: ${reason}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemIdsKey, appliedPromo]);
 
   const handleCheckout = () => {
     router.push('/checkout');
@@ -53,8 +90,10 @@ function ShoppingCartContent({ isOpen = true, onClose }: ShoppingCartProps) {
       // Validate promo code - using first course ID for validation
       if (items.length === 0) return;
       
-      const result = await promoCodesApi.validate(promoCode.toUpperCase(), items[0].courseId);
-      setAppliedPromo(result);
+      const courseId = items[0].courseId;
+      const result = await promoCodesApi.validate(promoCode.toUpperCase(), courseId);
+      validatedItemsKey.current = itemIdsKey;
+      setAppliedPromo({ ...result, courseId });
       setPromoCode('');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid promo code';

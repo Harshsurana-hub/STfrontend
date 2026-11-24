@@ -37,6 +37,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
+    "@storybook/addon-actions": "^10.6.2",
+    "@storybook/addon-links": "^10.6.2",
     "@testing-library/jest-dom": "^7.0.0",
     "@types/canvas-confetti": "^1.9.0",
     "@testing-library/react": "^16.3.3",
