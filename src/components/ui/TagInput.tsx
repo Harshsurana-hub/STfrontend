@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 const MAX_TAGS = 10;
 const DEBOUNCE_MS = 300;
 
-interface TagInputProps {
+export interface TagInputProps {
   /** Controlled value */
   value: string[];
   onChange: (tags: string[]) => void;
@@ -263,29 +263,17 @@ export function TagInput({
                 }}
                 onMouseEnter={() => setActiveIndex(i)}
                 className={cn(
-                  'flex cursor-pointer items-center gap-2 px-3.5 py-2 text-sm transition-colors',
+                  'cursor-pointer px-3 py-2 text-sm transition-colors',
                   i === activeIndex
                     ? 'bg-saffron-50 text-saffron-800'
                     : 'text-ink-700 hover:bg-ink-50',
                 )}
               >
-                <Tag className="h-3.5 w-3.5 shrink-0 text-ink-300" aria-hidden="true" />
                 {s}
               </li>
             ))}
           </ul>
         </div>
-      )}
-
-      {/* Keyboard hint */}
-      {!atMax && !disabled && (
-        <p className="text-[11px] text-ink-400">
-          Press <kbd className="rounded bg-ink-100 px-1 py-0.5 font-mono text-[10px]">Enter</kbd>{' '}
-          or{' '}
-          <kbd className="rounded bg-ink-100 px-1 py-0.5 font-mono text-[10px]">,</kbd> to add ·{' '}
-          <kbd className="rounded bg-ink-100 px-1 py-0.5 font-mono text-[10px]">Backspace</kbd> to
-          remove last
-        </p>
       )}
     </div>
   );

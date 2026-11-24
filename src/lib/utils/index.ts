@@ -23,7 +23,13 @@ export const stroopsToUsdc = (stroops: string | bigint) => {
 
 /** Convert USDC amount to stroops */
 export const usdcToStroops = (usdc: number | string): bigint => {
-  const [whole, fraction = ''] = String(usdc).split('.');
+  const raw = String(usdc).trim();
+  if (!/^\d*\.?\d*$/.test(raw) || raw === '' || raw === '.') {
+    throw new Error('usdcToStroops: amount must be a non-negative number');
+  }
+  const [wholePart, fractionPart] = raw.split('.');
+  const whole = wholePart || '0';
+  const fraction = fractionPart ?? '';
   const stroopsPerUsdc = BigInt(10_000_000);
   return BigInt(whole) * stroopsPerUsdc + BigInt(fraction.padEnd(7, '0').slice(0, 7));
 };
