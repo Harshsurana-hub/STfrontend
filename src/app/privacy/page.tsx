@@ -3,36 +3,26 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
-
-const sections = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'information-collection', label: 'Information We Collect' },
-  { id: 'how-we-use', label: 'How We Use Your Information' },
-  { id: 'information-sharing', label: 'Information Sharing' },
-  { id: 'data-security', label: 'Data Security' },
-  { id: 'cookies', label: 'Cookies and Tracking' },
-  { id: 'user-rights', label: 'Your Rights' },
-  { id: 'retention', label: 'Data Retention' },
-  { id: 'third-parties', label: 'Third-Party Services' },
-  { id: 'contact', label: 'Contact Us' },
-];
+import { PRIVACY_SECTIONS, type PrivacySectionId } from '@/lib/legal-sections';
 
 export default function PrivacyPage() {
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState<PrivacySectionId>('overview');
 
   useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            setActiveSection((entry.target as HTMLElement).id);
+            setActiveSection((entry.target as HTMLElement).id as PrivacySectionId);
           }
         });
       },
       { threshold: 0.3 }
     );
 
-    sections.forEach(({ id }) => {
+    PRIVACY_SECTIONS.forEach(({ id }) => {
       const element = document.getElementById(id);
       if (element) observer.observe(element);
     });
@@ -51,7 +41,7 @@ export default function PrivacyPage() {
               On this page
             </p>
             <ul className="space-y-2">
-              {sections.map(({ id, label }) => (
+              {PRIVACY_SECTIONS.map(({ id, label }) => (
                 <li key={id}>
                   <Link
                     href={`#${id}`}
