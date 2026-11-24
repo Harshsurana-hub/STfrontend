@@ -166,3 +166,8 @@ MIT
 ## Robots.txt
 
 Next.js generates `/robots.txt` from `src/app/robots.ts` using the App Router Metadata API. Public routes (`/`, `/courses`, `/categories/*`, `/about`, `/teach`, and `/teams`) are allowed; dashboard, checkout, API, authentication, and Next.js internal paths are disallowed. The generated file advertises `https://sorobanlard.com/sitemap.xml`.
+
+## Handsoff notes
+
+<!-- handsoff-issue-43 -->
+- #43: Cover the Reviews barrel components with tests: RatingSummary, ReviewFilter, ReviewForm, ReviewSection, ReviewsList
