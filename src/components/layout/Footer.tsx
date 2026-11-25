@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import Link from "next/link";
-import { newsletterApi } from "@/lib/api/services";
+import React from 'react';
+import Link from 'next/link';
+import { useState } from 'react';
+import { newsletterApi } from '@/lib/api/services';
 
 // ─── Newsletter form ──────────────────────────────────────────────────────────
 
@@ -33,14 +34,10 @@ function NewsletterForm() {
     setServerError("");
     try {
       await newsletterApi.subscribe(email.trim());
-      setStatus("success");
-    } catch (err: unknown) {
-      setStatus("error");
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : "Something went wrong. Please try again shortly.";
-      setServerError(message);
+      setStatus('success');
+    } catch {
+      setStatus('error');
+      setServerError('Something went wrong. Please try again shortly.');
     }
   };
 

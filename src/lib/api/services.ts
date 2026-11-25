@@ -802,6 +802,19 @@ export const contactApi = {
 };
 
 // ----------------------------------------------------------
+// Newsletter
+// ----------------------------------------------------------
+export const newsletterApi = {
+  subscribe: async (email: string) => {
+    const { data } = await apiClient.post<ApiResponse<{ subscribed: boolean }>>(
+      '/newsletter/subscribe',
+      { email },
+    );
+    return data.data;
+  },
+};
+
+// ----------------------------------------------------------
 // Two-Factor Authentication
 // ----------------------------------------------------------
 export const twoFactorApi = {

@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 const port = Number(process.env.MOCK_API_PORT ?? 3000);
 
@@ -37,6 +38,47 @@ const course = {
 const courses = [course];
 const categories = [{ name: 'Web Development', count: courses.length }];
 
+const leaderboardEntries = [
+  {
+    rank: 1,
+    user: {
+      id: 'user-1',
+      name: 'Alice Johnson',
+      stellarAddress: 'GALICE',
+      avatarUrl: null,
+    },
+    totalEarnings: 1250.5,
+    coursesCompleted: 12,
+    coursesCreated: 3,
+  },
+  {
+    rank: 2,
+    user: {
+      id: 'user-2',
+      name: 'Bob Smith',
+      stellarAddress: 'GBOB',
+      avatarUrl: null,
+    },
+    totalEarnings: 980.25,
+    coursesCompleted: 9,
+    coursesCreated: 2,
+  },
+  {
+    rank: 3,
+    user: {
+      id: 'user-3',
+      name: 'Carol Davis',
+      stellarAddress: 'GCAROL',
+      avatarUrl: null,
+    },
+    totalEarnings: 745,
+    coursesCompleted: 7,
+    coursesCreated: 1,
+  },
+];
+
+const failedLeaderboardPeriods = new Set();
+
 function respond(response, data, status = 200) {
   response.writeHead(status, {
     'Access-Control-Allow-Origin': '*',
@@ -47,7 +89,11 @@ function respond(response, data, status = 200) {
   response.end(JSON.stringify(data));
 }
 
-const server = createServer((request, response) => {
+export function createMockApiServer() {
+  return createServer(handleRequest);
+}
+
+export function handleRequest(request, response) {
   if (request.method === 'OPTIONS') {
     response.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -68,6 +114,27 @@ const server = createServer((request, response) => {
 
   if (pathname === '/api/v1/courses/categories') {
     respond(response, { success: true, data: categories });
+    return;
+  }
+
+  if (pathname === '/api/v1/leaderboard') {
+    const period = url.searchParams.get('period') ?? 'week';
+    const failOnce = url.searchParams.get('failOnce') === '1';
+
+    if (failOnce && !failedLeaderboardPeriods.has(period)) {
+      failedLeaderboardPeriods.add(period);
+      respond(response, { success: false, message: 'Leaderboard unavailable' }, 500);
+      return;
+    }
+
+    respond(response, {
+      success: true,
+      data: {
+        period,
+        entries: leaderboardEntries,
+        currentUser: null,
+      },
+    });
     return;
   }
 
@@ -113,6 +180,8 @@ const server = createServer((request, response) => {
   }
 
   respond(response, { success: true, data: [] });
-});
+}
 
-server.listen(port, '127.0.0.1');
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  createMockApiServer().listen(port, '127.0.0.1');
+}

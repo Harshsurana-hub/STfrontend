@@ -11,3 +11,5 @@ export { CardBrandIcon, cardBrandLabel, normalizeCardBrand } from './CardBrandIc
 export type { CardBrand } from './CardBrandIcon';
 export { WalletPaymentButton } from './WalletPaymentButton';
 export type { WalletPaymentButtonProps } from './WalletPaymentButton';
+export { AddPaymentMethodModal } from './AddPaymentMethodModal';
+export type { AddPaymentMethodModalProps } from './AddPaymentMethodModal';

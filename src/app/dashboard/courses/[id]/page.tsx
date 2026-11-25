@@ -5,10 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Clock, Users, BookOpen, Award,
-  Loader2, CheckCircle2, Lock,
+  Loader2, CheckCircle2, Lock, ExternalLink,
 } from 'lucide-react';
 import { coursesApi, enrollmentsApi } from '@/lib/api/services';
-import { enrollInCourse } from '@/lib/stellar/contract';
+import {
+  enrollInCourse, stellarExplorerTxUrl, TransactionPendingError,
+} from '@/lib/stellar/contract';
 import { useAuthStore } from '@/lib/hooks/use-auth-store';
 import {
   formatUsdc, formatDuration, levelChip, timeAgo, usdcToStroops,
@@ -29,6 +31,8 @@ export default function CourseDetailPage() {
   const [enrolling,  setEnrolling]  = useState(false);
   const [txStep,     setTxStep]     = useState('');
   const [error,      setError]      = useState<string | null>(null);
+  // Hash of a submitted payment that was not confirmed in time; it may still succeed.
+  const [pendingTxHash, setPendingTxHash] = useState<string | null>(null);
 
   useEffect(() => {
     coursesApi.get(id).then(setCourse).catch(console.error).finally(() => setLoading(false));
@@ -57,6 +61,10 @@ export default function CourseDetailPage() {
 
       router.push(`/dashboard/courses/${id}/learn`);
     } catch (err: any) {
+      if (err instanceof TransactionPendingError) {
+        setPendingTxHash(err.hash);
+        return;
+      }
       setError(err?.message ?? 'Enrollment failed. Please try again.');
     } finally {
       setEnrolling(false);
@@ -186,6 +194,26 @@ export default function CourseDetailPage() {
               </div>
             )}
 
+            {pendingTxHash && (
+              <div role="status" className="mb-3 p-3 rounded-xl bg-saffron-50 border border-saffron-200">
+                <p className="text-xs font-semibold text-ink-900">Payment submitted, not yet confirmed</p>
+                <p className="text-xs text-ink-600 mt-1">
+                  Your transaction may still go through. Please don&apos;t pay again — check its
+                  status on the Stellar explorer and refresh this page once it is confirmed.
+                </p>
+                <p className="text-[11px] text-ink-500 font-mono break-all mt-2">{pendingTxHash}</p>
+                <a
+                  href={stellarExplorerTxUrl(pendingTxHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-saffron-700 hover:underline mt-2"
+                >
+                  View transaction on Stellar Expert
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            )}
+
             {isEnrolled ? (
               <Link href={`/dashboard/courses/${id}/learn`} className="btn-leaf w-full text-base py-3">
                 <CheckCircle2 className="w-4 h-4" />
@@ -194,7 +222,7 @@ export default function CourseDetailPage() {
             ) : isConnected ? (
               <button
                 onClick={handleEnroll}
-                disabled={enrolling}
+                disabled={enrolling || !!pendingTxHash}
                 className="btn-primary w-full text-base py-3"
               >
                 {enrolling

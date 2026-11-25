@@ -1,80 +1,59 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { Footer } from "./Footer";
-import { newsletterApi } from "@/lib/api/services";
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import '@testing-library/jest-dom';
+import { Footer } from './Footer';
+import { newsletterApi } from '@/lib/api/services';
 
-vi.mock("@/lib/api/services", () => ({
+vi.mock('@/lib/api/services', () => ({
   newsletterApi: {
     subscribe: vi.fn(),
   },
 }));
 
-describe("Footer NewsletterForm (#85)", () => {
+describe('Footer newsletter form', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.mocked(newsletterApi.subscribe).mockReset();
   });
 
-  it("renders success message when newsletter subscription succeeds", async () => {
-    vi.mocked(newsletterApi.subscribe).mockResolvedValueOnce(undefined);
-
+  it('renders the success status when the subscribe call resolves', async () => {
+    const user = userEvent.setup();
+    vi.mocked(newsletterApi.subscribe).mockResolvedValue({ subscribed: true });
     render(<Footer />);
 
-    const input = screen.getByPlaceholderText("you@example.com");
-    const submitBtn = screen.getByRole("button", { name: "Subscribe" });
+    await user.type(screen.getByLabelText(/email address/i), 'learner@example.com');
+    await user.click(screen.getByRole('button', { name: /subscribe/i }));
 
-    fireEvent.change(input, { target: { value: "user@example.com" } });
-    fireEvent.click(submitBtn);
-
-    await waitFor(() => {
-      expect(newsletterApi.subscribe).toHaveBeenCalledWith("user@example.com");
-      const statusMessage = screen.getByRole("status");
-      expect(statusMessage).toBeInTheDocument();
-      expect(statusMessage).toHaveTextContent(
-        /You're in! Thanks for subscribing/i,
-      );
-    });
+    expect(await screen.findByRole('status')).toHaveTextContent(/thanks for subscribing/i);
+    expect(newsletterApi.subscribe).toHaveBeenCalledWith('learner@example.com');
   });
 
-  it("renders server error alert when newsletter subscription rejects", async () => {
-    vi.mocked(newsletterApi.subscribe).mockRejectedValueOnce(
-      new Error("Email already subscribed."),
-    );
+  it('renders the server error alert when the subscribe call rejects', async () => {
+    const user = userEvent.setup();
+    vi.mocked(newsletterApi.subscribe).mockRejectedValue(new Error('Server error'));
+    const { container } = render(<Footer />);
 
-    render(<Footer />);
-
-    const input = screen.getByPlaceholderText("you@example.com");
-    const submitBtn = screen.getByRole("button", { name: "Subscribe" });
-
-    fireEvent.change(input, { target: { value: "existing@example.com" } });
-    fireEvent.click(submitBtn);
+    await user.type(screen.getByLabelText(/email address/i), 'learner@example.com');
+    await user.click(screen.getByRole('button', { name: /subscribe/i }));
 
     await waitFor(() => {
-      expect(newsletterApi.subscribe).toHaveBeenCalledWith(
-        "existing@example.com",
-      );
-      const errorAlert = screen.getByRole("alert");
-      expect(errorAlert).toBeInTheDocument();
-      expect(errorAlert).toHaveTextContent("Email already subscribed.");
-      expect(errorAlert).toHaveAttribute("id", "nl-server-error");
+      expect(container.querySelector('#nl-server-error')).toBeInTheDocument();
     });
+    const alert = container.querySelector('#nl-server-error');
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(alert).toHaveTextContent(/something went wrong/i);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it("shows client validation error and does not call API on invalid email", async () => {
+  it('does not call the service for an invalid email', async () => {
+    const user = userEvent.setup();
     render(<Footer />);
 
-    const input = screen.getByPlaceholderText("you@example.com");
-    const submitBtn = screen.getByRole("button", { name: "Subscribe" });
+    await user.type(screen.getByLabelText(/email address/i), 'not-an-email');
+    await user.click(screen.getByRole('button', { name: /subscribe/i }));
 
-    fireEvent.change(input, { target: { value: "invalid-email" } });
-    fireEvent.click(submitBtn);
-
-    await waitFor(() => {
-      expect(newsletterApi.subscribe).not.toHaveBeenCalled();
-      const errorAlert = screen.getByRole("alert");
-      expect(errorAlert).toHaveTextContent(
-        "Please enter a valid email address.",
-      );
-      expect(errorAlert).toHaveAttribute("id", "nl-email-error");
-    });
+    expect(await screen.findByText(/valid email address/i)).toBeInTheDocument();
+    expect(newsletterApi.subscribe).not.toHaveBeenCalled();
   });
 });
