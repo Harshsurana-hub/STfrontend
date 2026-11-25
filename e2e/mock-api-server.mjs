@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 const port = Number(process.env.MOCK_API_PORT ?? 3000);
 
@@ -88,7 +89,11 @@ function respond(response, data, status = 200) {
   response.end(JSON.stringify(data));
 }
 
-const server = createServer((request, response) => {
+export function createMockApiServer() {
+  return createServer(handleRequest);
+}
+
+export function handleRequest(request, response) {
   if (request.method === 'OPTIONS') {
     response.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -175,6 +180,8 @@ const server = createServer((request, response) => {
   }
 
   respond(response, { success: true, data: [] });
-});
+}
 
-server.listen(port, '127.0.0.1');
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  createMockApiServer().listen(port, '127.0.0.1');
+}
