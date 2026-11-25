@@ -169,8 +169,8 @@ Next.js generates `/robots.txt` from `src/app/robots.ts` using the App Router Me
 
 ## Handsoff notes
 
-<!-- handsoff-issue-40 -->
-- #40: Add unit tests for the player Q&A barrel components
+<!-- handsoff-issue-43 -->
+- #43: Cover the Reviews barrel components with tests: RatingSummary, ReviewFilter, ReviewForm, ReviewSection, ReviewsList
 
-<!-- handsoff-issue-41 -->
-- #41: Add tests for the home barrel exports: RecentlyViewed, ContinueLearningBanner and TestimonialsCarousel
+<!-- handsoff-issue-46 -->
+- #46: Add tests for the checkout barrel components not yet covered

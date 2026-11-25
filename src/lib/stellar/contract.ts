@@ -7,7 +7,7 @@
 
 import {
   Networks, SorobanRpc, Contract, TransactionBuilder,
-  BASE_FEE, nativeToScVal, xdr, Address,
+  BASE_FEE, nativeToScVal, xdr, Address, StrKey,
 } from '@stellar/stellar-sdk';
 import { signTx } from './freighter';
 
@@ -16,8 +16,48 @@ const CONTRACT_ID = process.env.NEXT_PUBLIC_CONTRACT_ID!;
 const NETWORK     = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'testnet';
 const PASSPHRASE  = NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
 
+/**
+ * Thrown when a submitted transaction is still pending after the confirmation window.
+ * It may still succeed, so callers should show `hash` (e.g. via `stellarExplorerTxUrl`)
+ * instead of prompting a retry that could charge the learner twice.
+ * The message stays `Transaction not confirmed` so existing string checks still match.
+ */
+export class TransactionPendingError extends Error {
+  readonly hash: string;
+
+  constructor(hash: string) {
+    super('Transaction not confirmed');
+    this.name = 'TransactionPendingError';
+    this.hash = hash;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/** Stellar Expert URL for a transaction hash on the configured network. */
+export function stellarExplorerTxUrl(hash: string): string {
+  const network = NETWORK === 'mainnet' ? 'public' : 'testnet';
+  return `https://stellar.expert/explorer/${network}/tx/${hash}`;
+}
+
 let _rpc: SorobanRpc.Server;
 const getRpc = () => (_rpc ??= new SorobanRpc.Server(RPC_URL, { allowHttp: true }));
+
+/** Throws `Invalid Stellar address for <field>` unless `value` is a valid account (G...) address. */
+function assertValidAddress(value: string, field: string): void {
+  if (typeof value !== 'string' || !StrKey.isValidEd25519PublicKey(value)) {
+    throw new Error(`Invalid Stellar address for ${field}`);
+  }
+}
+
+/** Like `assertValidAddress`, but also accepts a contract (C...) address, e.g. a token contract. */
+function assertValidTokenAddress(value: string, field: string): void {
+  if (
+    typeof value !== 'string' ||
+    !(StrKey.isValidEd25519PublicKey(value) || StrKey.isValidContract(value))
+  ) {
+    throw new Error(`Invalid Stellar address for ${field}`);
+  }
+}
 
 async function invokeContract(caller: string, method: string, args: xdr.ScVal[]): Promise<string> {
   const rpc      = getRpc();
@@ -51,7 +91,7 @@ async function waitForTx(hash: string): Promise<string> {
     if (r.status === SorobanRpc.Api.GetTransactionStatus.FAILED)
       throw new Error(`Transaction failed: ${hash}`);
   }
-  throw new Error('Transaction not confirmed');
+  throw new TransactionPendingError(hash);
 }
 
 /**
@@ -64,16 +104,19 @@ async function waitForTx(hash: string): Promise<string> {
  * - `Simulation: <reason>` when the contract rejects the call. Signing has not been requested yet.
  * - `Submission failed` when the RPC server rejects the signed transaction.
  * - `Transaction failed: <hash>` when the transaction is included but fails on-chain.
- * - `Transaction not confirmed` when it is still pending after about 40 seconds. It may still
- *   succeed, so look up the hash before retrying, or the learner could be charged twice.
+ * - `Transaction not confirmed` (a {@link TransactionPendingError} carrying the submitted `hash`)
+ *   when it is still pending after about 40 seconds. It may still succeed, so look up the hash
+ *   before retrying, or the learner could be charged twice.
  *
  * Errors from the wallet (for example the user declining to sign) and from RPC requests
- * propagate unchanged. Throws if `callerAddress` is not a valid Stellar address.
+ * propagate unchanged. Rejects with `Invalid Stellar address for callerAddress` before any
+ * RPC request or signing if `callerAddress` is not a valid Stellar address.
  */
 export async function enrollInCourse(params: {
   callerAddress: string;
   courseId: string;
 }): Promise<string> {
+  assertValidAddress(params.callerAddress, 'callerAddress');
   return invokeContract(params.callerAddress, 'enroll', [
     new Address(params.callerAddress).toScVal(),
     nativeToScVal(params.courseId, { type: 'string' }),
@@ -93,6 +136,8 @@ export async function registerCourseOnChain(params: {
   tokenAddress: string;
   platformFeePct?: number;
 }): Promise<string> {
+  assertValidAddress(params.callerAddress, 'callerAddress');
+  assertValidTokenAddress(params.tokenAddress, 'tokenAddress');
   return invokeContract(params.callerAddress, 'register_course', [
     new Address(params.callerAddress).toScVal(),
     nativeToScVal(params.courseId, { type: 'string' }),
