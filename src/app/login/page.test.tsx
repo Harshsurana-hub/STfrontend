@@ -98,6 +98,46 @@ describe('LoginPage integration', () => {
     expect(localStorage.getItem('sorobanlard_token')).toBe('token-123');
   });
 
+  it('redirects to the callbackUrl after a successful sign-in', async () => {
+    const user = userEvent.setup();
+    mockGetSearchParam.mockImplementation((key: string) =>
+      key === 'callbackUrl' ? '/dashboard/my-courses' : null,
+    );
+    loginWithEmailMock.mockResolvedValue({
+      accessToken: 'token-123',
+      user: { id: 'user-1', email: 'student@example.com' },
+    } as any);
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText(/email/i), 'student@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /login/i }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/dashboard/my-courses');
+    });
+    expect(mockPush).not.toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('redirects to the default destination when no callbackUrl is present', async () => {
+    const user = userEvent.setup();
+    mockGetSearchParam.mockReturnValue(null);
+    loginWithEmailMock.mockResolvedValue({
+      accessToken: 'token-123',
+      user: { id: 'user-1', email: 'student@example.com' },
+    } as any);
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText(/email/i), 'student@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /login/i }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+    });
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
   it('shows an inline error message when the API rejects with invalid credentials', async () => {
     const user = userEvent.setup();
     const error = new AxiosError(
