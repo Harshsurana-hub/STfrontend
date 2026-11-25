@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { newsletterApi } from '@/lib/api/services';
 
 // ─── Newsletter form ──────────────────────────────────────────────────────────
 
@@ -30,10 +31,7 @@ function NewsletterForm() {
     setValidationError('');
     setStatus('loading');
     try {
-      // Replace with real API call when available
-      await new Promise<void>((resolve, reject) =>
-        setTimeout(() => (Math.random() > 0.15 ? resolve() : reject(new Error('Server error'))), 900),
-      );
+      await newsletterApi.subscribe(email.trim());
       setStatus('success');
     } catch {
       setStatus('error');

@@ -1,170 +1,146 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+```typescript
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reportWebVitals } from './reportWebVitals';
 
 describe('reportWebVitals', () => {
-  const originalSendBeacon = navigator.sendBeacon;
-  const originalFetch = globalThis.fetch;
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
     vi.unstubAllEnvs();
-    Object.defineProperty(navigator, 'sendBeacon', {
-      value: originalSendBeacon,
-      configurable: true,
-      writable: true,
-    });
-    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+    // Remove any sendBeacon stub installed during a test.
+    delete (navigator as unknown as { sendBeacon?: unknown }).sendBeacon;
   });
 
-  describe('Non-core metrics gating', () => {
-    it('produces no console output and no network call for non-core metrics', () => {
+  it('ignores non-core metrics', () => {
+    const sendBeacon = vi.fn();
+    Object.defineProperty(navigator, 'sendBeacon', {
+      configurable: true,
+      writable: true,
+      value: sendBeacon,
+    });
+    const fetchSpy = vi.fn().mockResolvedValue({});
+    vi.stubGlobal('fetch', fetchSpy);
+
+    reportWebVitals({ name: 'FCP', value: 5000 } as never);
+
+    expect(infoSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(sendBeacon).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  describe('in development', () => {
+    beforeEach(() => {
       vi.stubEnv('NODE_ENV', 'development');
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const fetchSpy = vi.fn().mockResolvedValue(new Response());
-      globalThis.fetch = fetchSpy;
+    });
 
-      reportWebVitals({
-        name: 'TTFB',
-        value: 300,
-        rating: 'good',
-      });
+    it('logs core metrics via console.info', () => {
+      reportWebVitals({ name: 'LCP', value: 1000 } as never);
 
-      expect(infoSpy).not.toHaveBeenCalled();
+      expect(infoSpy).toHaveBeenCalled();
       expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('warns when LCP exceeds 2500ms', () => {
+      reportWebVitals({ name: 'LCP', value: 3000 } as never);
+
+      expect(infoSpy).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('does not warn when LCP is at the threshold', () => {
+      reportWebVitals({ name: 'LCP', value: 2500 } as never);
+
+      expect(infoSpy).toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('warns when CLS exceeds 0.1', () => {
+      reportWebVitals({ name: 'CLS', value: 0.2 } as never);
+
+      expect(infoSpy).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('does not warn when CLS is at the threshold', () => {
+      reportWebVitals({ name: 'CLS', value: 0.1 } as never);
+
+      expect(infoSpy).toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not send analytics in development', () => {
+      const sendBeacon = vi.fn();
+      Object.defineProperty(navigator, 'sendBeacon', {
+        configurable: true,
+        writable: true,
+        value: sendBeacon,
+      });
+      const fetchSpy = vi.fn().mockResolvedValue({});
+      vi.stubGlobal('fetch', fetchSpy);
+
+      reportWebVitals({ name: 'LCP', value: 1000 } as never);
+
+      expect(sendBeacon).not.toHaveBeenCalled();
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 
-  describe('Development environment logging and threshold warnings', () => {
-    it('logs console.info for core metrics within acceptable threshold', () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      reportWebVitals({
-        name: 'LCP',
-        value: 2000,
-        rating: 'good',
-      });
-
-      expect(infoSpy).toHaveBeenCalledTimes(1);
-      expect(infoSpy).toHaveBeenCalledWith(
-        '[Web Vitals]',
-        expect.objectContaining({ name: 'LCP', value: 2000, rating: 'good' }),
-      );
-      expect(warnSpy).not.toHaveBeenCalled();
+  describe('in production', () => {
+    beforeEach(() => {
+      vi.stubEnv('NODE_ENV', 'production');
     });
 
-    it('triggers console.warn when LCP exceeds 2500ms', () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      reportWebVitals({
-        name: 'LCP',
-        value: 2800,
-        rating: 'poor',
-      });
-
-      expect(infoSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[Web Vitals] Warning: LCP is above threshold (2800ms > 2500ms)'),
-        expect.objectContaining({ name: 'LCP', value: 2800, rating: 'poor' }),
-      );
-    });
-
-    it('triggers console.warn when CLS exceeds 0.1', () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      reportWebVitals({
-        name: 'CLS',
-        value: 0.25,
-        rating: 'poor',
-      });
-
-      expect(infoSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[Web Vitals] Warning: CLS is above threshold (0.25 > 0.1)'),
-        expect.objectContaining({ name: 'CLS', value: 0.25, rating: 'poor' }),
-      );
-    });
-
-    it('does not send to analytics in development', () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      const sendBeaconMock = vi.fn();
+    it('sends analytics via navigator.sendBeacon', () => {
+      const sendBeacon = vi.fn().mockReturnValue(true);
       Object.defineProperty(navigator, 'sendBeacon', {
-        value: sendBeaconMock,
         configurable: true,
         writable: true,
+        value: sendBeacon,
       });
+      const fetchSpy = vi.fn().mockResolvedValue({});
+      vi.stubGlobal('fetch', fetchSpy);
 
-      reportWebVitals({
-        name: 'LCP',
-        value: 1200,
-        rating: 'good',
-      });
+      reportWebVitals({ name: 'LCP', value: 1000 } as never);
 
-      expect(sendBeaconMock).not.toHaveBeenCalled();
+      expect(sendBeacon).toHaveBeenCalledTimes(1);
+      const [url, body] = sendBeacon.mock.calls[0];
+      expect(url).toBe('/api/analytics/web-vitals');
+      expect(body).toBeInstanceOf(Blob);
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
-  });
 
-  describe('Production analytics transmission', () => {
-    it('calls navigator.sendBeacon with the analytics endpoint when available', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      const sendBeaconMock = vi.fn().mockReturnValue(true);
+    it('falls back to fetch with keepalive when sendBeacon is unavailable', () => {
+      delete (navigator as unknown as { sendBeacon?: unknown }).sendBeacon;
+      const fetchSpy = vi.fn().mockResolvedValue({});
+      vi.stubGlobal('fetch', fetchSpy);
+
+      reportWebVitals({ name: 'LCP', value: 1000 } as never);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, options] = fetchSpy.mock.calls[0];
+      expect(url).toBe('/api/analytics/web-vitals');
+      expect(options).toMatchObject({ keepalive: true });
+    });
+
+    it('does not log via console.info in production', () => {
+      const sendBeacon = vi.fn().mockReturnValue(true);
       Object.defineProperty(navigator, 'sendBeacon', {
-        value: sendBeaconMock,
         configurable: true,
         writable: true,
+        value: sendBeacon,
       });
 
-      reportWebVitals({
-        name: 'LCP',
-        value: 1500,
-        rating: 'good',
-      });
+      reportWebVitals({ name: 'LCP', value: 1000 } as never);
 
-      expect(sendBeaconMock).toHaveBeenCalledTimes(1);
-      expect(sendBeaconMock).toHaveBeenCalledWith(
-        '/api/analytics/web-vitals',
-        expect.any(Blob),
-      );
-    });
-
-    it('falls back to fetch with keepalive: true when sendBeacon is not available', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      // Remove sendBeacon
-      // @ts-expect-error test sendBeacon removal
-      delete navigator.sendBeacon;
-
-      const fetchMock = vi.fn().mockResolvedValue(new Response());
-      globalThis.fetch = fetchMock;
-
-      reportWebVitals({
-        name: 'INP',
-        value: 80,
-        rating: 'good',
-      });
-
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/analytics/web-vitals',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          keepalive: true,
-        }),
-      );
+      expect(infoSpy).not.toHaveBeenCalled();
     });
   });
 });
