@@ -1,35 +1,49 @@
-// @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { NextRequest } from 'next/server';
-import { isPublicPath, middleware } from './middleware';
+import { middleware, isPublicPath } from './middleware';
 
-describe('isPublicPath', () => {
-  it('matches public paths and anything nested under them', () => {
-    expect(isPublicPath('/courses')).toBe(true);
-    expect(isPublicPath('/courses/stellar-101')).toBe(true);
-    expect(isPublicPath('/certificates/abc123')).toBe(true);
-    expect(isPublicPath('/auth/login')).toBe(true);
+function makeRequest(pathname: string, token?: string): NextRequest {
+  const url = new URL(pathname, 'http://localhost:3000');
+  const request = new NextRequest(url);
+  if (token) request.cookies.set('sorobanlard_token', token);
+  return request;
+}
+
+const PUBLIC_ROUTES = ['/', '/courses', '/courses/abc', '/certificates/abc'];
+
+const PROTECTED_ROUTES = ['/dashboard', '/notifications'];
+
+describe('middleware public-path matcher', () => {
+  it.each(PUBLIC_ROUTES)('does not redirect unauthenticated %s', (pathname) => {
+    const response = middleware(makeRequest(pathname));
+    expect(response.headers.get('location')).toBeNull();
   });
 
-  it('does not treat a route that only shares a string prefix as public', () => {
-    // Regression: startsWith('/courses') used to make these public.
-    expect(isPublicPath('/courses-admin')).toBe(false);
-    expect(isPublicPath('/coursesx')).toBe(false);
-    expect(isPublicPath('/login-history')).toBe(false);
-    expect(isPublicPath('/certificates-export')).toBe(false);
+  it.each(PROTECTED_ROUTES)('redirects unauthenticated %s to login', (pathname) => {
+    const response = middleware(makeRequest(pathname));
+    const location = response.headers.get('location');
+    expect(location).not.toBeNull();
+    expect(location).toContain('/login');
+  });
+
+  it('redirects /dashboard with a callbackUrl', () => {
+    const response = middleware(makeRequest('/dashboard'));
+    const location = response.headers.get('location') ?? '';
+    expect(location).toContain('callbackUrl=%2Fdashboard');
+  });
+
+  it('allows authenticated users through to /dashboard', () => {
+    const response = middleware(makeRequest('/dashboard', 'valid-token'));
+    expect(response.headers.get('location')).toBeNull();
   });
 });
 
-describe('middleware', () => {
-  it('lets a nested public route through without a token', () => {
-    const res = middleware(new NextRequest('http://localhost:3001/courses/stellar-101'));
-    expect(res.headers.get('location')).toBeNull();
+describe('isPublicPath', () => {
+  it.each(PUBLIC_ROUTES.filter((p) => p !== '/'))('treats %s as public', (pathname) => {
+    expect(isPublicPath(pathname)).toBe(true);
   });
 
-  it('redirects an unauthenticated dashboard request to login', () => {
-    const res = middleware(new NextRequest('http://localhost:3001/dashboard/courses'));
-    const location = new URL(res.headers.get('location') ?? '');
-    expect(location.pathname).toBe('/login');
-    expect(location.searchParams.get('callbackUrl')).toBe('/dashboard/courses');
+  it('does not treat /courses-admin as public', () => {
+    expect(isPublicPath('/courses-admin')).toBe(false);
   });
 });

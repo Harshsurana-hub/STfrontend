@@ -25,7 +25,15 @@ export type StripeDeclineCode =
   | 'do_not_honor'
   | 'transaction_not_allowed'
   | 'fraudulent'
-  | 'generic_decline';
+  | 'generic_decline'
+  | 'authentication_required'
+  | 'card_not_supported'
+  | 'incorrect_number'
+  | 'invalid_account'
+  | 'pickup_card'
+  | 'processing_error'
+  | 'try_again_later'
+  | 'withdrawal_count_limit_exceeded';
 
 // ── Error codes ───────────────────────────────────────────────────────────────
 
@@ -49,7 +57,9 @@ export type StripeErrorCode =
   | 'processing_error'
   | 'authentication_required'
   | 'rate_limit'
-  | 'api_key_expired';
+  | 'api_key_expired'
+  | 'card_decline_rate_limit_exceeded'
+  | 'payment_intent_authentication_failure';
 
 // ── Error types ───────────────────────────────────────────────────────────────
 

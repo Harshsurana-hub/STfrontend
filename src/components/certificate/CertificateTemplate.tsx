@@ -2,12 +2,13 @@ import React from 'react';
 import { QrCode, Award, CheckCircle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { formatDate } from '@/lib/utils';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-interface CertificateProps {
+export interface CertificateProps {
   studentName: string;
   courseTitle: string;
   completionDate: string;
@@ -251,6 +252,45 @@ export function BadgeCertificate({
       <div className="absolute top-4 right-4 text-saffron-400/20">
         <CheckCircle size={120} />
       </div>
+    </div>
+  );
+}
+
+export type CertificateVariant = 'print' | 'digital';
+
+export interface CertificateTemplateProps extends Omit<CertificateProps, 'completionDate'> {
+  /** ISO date the certificate was issued; rendered as e.g. "Mar 5, 2024". */
+  issuedAt: string;
+  /** Whether the certificate has been verified on-chain. */
+  isValid: boolean;
+  /** Layout to render. Defaults to the printable certificate. */
+  variant?: CertificateVariant;
+}
+
+/**
+ * Certificate as shown on the public `/certificates/[id]` verification page: the chosen
+ * layout with a formatted issue date, plus the verification status.
+ */
+export function CertificateTemplate({
+  issuedAt,
+  isValid,
+  variant = 'print',
+  ...props
+}: CertificateTemplateProps) {
+  const Certificate = variant === 'digital' ? DigitalCertificate : PrintCertificate;
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <Certificate {...props} completionDate={formatDate(issuedAt)} />
+      <p
+        role="status"
+        className={cn(
+          'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium',
+          isValid ? 'bg-leaf-50 text-leaf-700' : 'bg-red-50 text-red-700',
+        )}
+      >
+        {isValid ? <CheckCircle size={16} aria-hidden="true" /> : null}
+        {isValid ? 'Verified on Stellar blockchain' : 'Not verified'}
+      </p>
     </div>
   );
 }
