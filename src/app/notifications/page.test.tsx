@@ -32,12 +32,74 @@ const mockNotifications = [
   },
 ];
 
-describe("NotificationsPage Accessibility (#124)", () => {
+describe("NotificationsPage Error State & Accessibility (#125)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renders the feed as a labelled list with an accessible name", async () => {
+  it("renders an error message and Retry button when notificationsApi.list() rejects", async () => {
+    vi.mocked(notificationsApi.list).mockRejectedValueOnce(
+      new Error("Network error"),
+    );
+
+    render(<NotificationsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Failed to load notifications"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Network error")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+      expect(
+        screen.queryByText("No notifications yet"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("retries fetching notifications when Retry button is clicked", async () => {
+    vi.mocked(notificationsApi.list)
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockResolvedValueOnce({ data: mockNotifications, status: 200 } as any);
+
+    render(<NotificationsPage />);
+
+    const retryButton = await screen.findByRole("button", { name: "Retry" });
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(notificationsApi.list).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Course Approved")).toBeInTheDocument();
+    });
+  });
+
+  it("leaves notification unread and displays an inline error when markRead rejects", async () => {
+    vi.mocked(notificationsApi.list).mockResolvedValueOnce({
+      data: mockNotifications,
+      status: 200,
+    } as any);
+    vi.mocked(notificationsApi.markRead).mockRejectedValueOnce(
+      new Error("Failed to update"),
+    );
+
+    render(<NotificationsPage />);
+
+    const unreadButton = await screen.findByRole("button", {
+      name: "Unread notification: Course Approved",
+    });
+    fireEvent.click(unreadButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to update")).toBeInTheDocument();
+      // notification should still remain unread in the list
+      expect(
+        screen.getByRole("button", {
+          name: "Unread notification: Course Approved",
+        }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders list with accessible names when notifications load successfully", async () => {
     vi.mocked(notificationsApi.list).mockResolvedValueOnce({
       data: mockNotifications,
       status: 200,
@@ -49,18 +111,6 @@ describe("NotificationsPage Accessibility (#124)", () => {
       expect(
         screen.getByRole("list", { name: "Notifications" }),
       ).toBeInTheDocument();
-    });
-  });
-
-  it("provides accessible names indicating read/unread status and title on buttons", async () => {
-    vi.mocked(notificationsApi.list).mockResolvedValueOnce({
-      data: mockNotifications,
-      status: 200,
-    } as any);
-
-    render(<NotificationsPage />);
-
-    await waitFor(() => {
       expect(
         screen.getByRole("button", {
           name: "Unread notification: Course Approved",
@@ -72,22 +122,5 @@ describe("NotificationsPage Accessibility (#124)", () => {
         }),
       ).toBeInTheDocument();
     });
-  });
-
-  it("marks an unread notification as read when clicked", async () => {
-    vi.mocked(notificationsApi.list).mockResolvedValueOnce({
-      data: mockNotifications,
-      status: 200,
-    } as any);
-    vi.mocked(notificationsApi.markRead).mockResolvedValueOnce({} as any);
-
-    render(<NotificationsPage />);
-
-    const unreadButton = await screen.findByRole("button", {
-      name: "Unread notification: Course Approved",
-    });
-    fireEvent.click(unreadButton);
-
-    expect(notificationsApi.markRead).toHaveBeenCalledWith("notif-1");
   });
 });

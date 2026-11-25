@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { AlertCircle, Bell, CheckCheck, Loader2 } from "lucide-react";
 import { notificationsApi } from "@/lib/api/services";
 import { timeAgo } from "@/lib/utils";
 import type { Notification } from "@/types";
@@ -23,13 +23,18 @@ const TYPE_COLORS: Record<string, string> = {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
+    setError(null);
     notificationsApi
       .list()
       .then((r) => setNotifications(r.data))
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        setError(err?.message || "Failed to load notifications");
+      })
       .finally(() => setLoading(false));
   };
 
@@ -38,15 +43,33 @@ export default function NotificationsPage() {
   }, []);
 
   const handleMarkAllRead = async () => {
-    await notificationsApi.markAllRead();
-    load();
+    setError(null);
+    try {
+      await notificationsApi.markAllRead();
+      load();
+    } catch (err: unknown) {
+      console.error(err);
+      const message =
+        err instanceof Error ? err.message : "Failed to mark all as read";
+      setError(message);
+    }
   };
 
   const handleMarkRead = async (id: string) => {
-    await notificationsApi.markRead(id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
+    setError(null);
+    try {
+      await notificationsApi.markRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+    } catch (err: unknown) {
+      console.error(err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to mark notification as read";
+      setError(message);
+    }
   };
 
   const unread = notifications.filter((n) => !n.read).length;
@@ -68,9 +91,38 @@ export default function NotificationsPage() {
         )}
       </div>
 
+      {error && notifications.length > 0 && (
+        <div
+          role="alert"
+          className="mb-4 p-4 rounded-xl border border-red-200 bg-red-50 flex items-center justify-between gap-3 text-sm text-red-700"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-xs font-semibold text-red-700 underline hover:no-underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="w-5 h-5 text-saffron-400 animate-spin" />
+        </div>
+      ) : error && notifications.length === 0 ? (
+        <div role="alert" className="card p-12 text-center">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
+          <p className="text-sm font-medium text-ink-900 mb-1">
+            Failed to load notifications
+          </p>
+          <p className="text-xs text-ink-500 mb-4">{error}</p>
+          <button onClick={load} className="btn-primary text-xs mx-auto">
+            Retry
+          </button>
         </div>
       ) : notifications.length === 0 ? (
         <div className="card p-12 text-center">
