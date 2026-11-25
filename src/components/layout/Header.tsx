@@ -20,6 +20,7 @@ import { useMobileDrawerFocusTrap } from '@/lib/hooks/use-focus-trap';
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import { coursesApi } from '@/lib/api/services';
 import { CATEGORY_META, getCategoryMeta } from '@/components/category/CategoryHero';
+import { deriveSubcategories } from '@/lib/utils/subcategories';
 import type { Category, Course } from '@/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -50,28 +51,6 @@ const CATEGORY_SUBCATEGORY_FALLBACKS: Record<string, string[]> = {
   business: ['Marketing', 'Finance', 'Entrepreneurship'],
 };
 
-function deriveSubcategories(courses: Course[], categoryName: string) {
-  const excluded = new Set([
-    'about', 'advanced', 'beginner', 'complete', 'course', 'courses', 'from',
-    'guide', 'learn', 'masterclass', 'professional', 'skills', 'the', 'with',
-    ...categoryName.toLowerCase().split(/\s+/),
-  ]);
-  const counts = new Map<string, number>();
-
-  for (const course of courses) {
-    for (const word of course.title.toLowerCase().split(/\s+/)) {
-      const term = word.replace(/[^a-z]/g, '');
-      if (term.length > 3 && !excluded.has(term)) {
-        counts.set(term, (counts.get(term) ?? 0) + 1);
-      }
-    }
-  }
-
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 3)
-    .map(([term]) => term.charAt(0).toUpperCase() + term.slice(1));
-}
 
 const NAV_LINKS = [
   { label: 'Courses', href: '/dashboard/courses' },
@@ -116,7 +95,10 @@ export function Header() {
         setMegaCategories(mapped);
         setActiveCategorySlug(mapped[0]?.slug ?? '');
       })
-      .catch(() => {/* keep static fallback */ });
+      .catch((error: unknown) => {
+        // Keep the static fallback categories and activeCategorySlug as they are.
+        console.warn('Header: failed to load categories, using static fallback', error);
+      });
 
     coursesApi.list({ limit: 100 })
       .then((response) => setCategoryCourses(response.data ?? []))

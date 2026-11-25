@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import '@testing-library/jest-dom';
@@ -678,6 +678,92 @@ describe('ShoppingCart Integration Tests', () => {
       await waitFor(() => {
         expect(screen.getByText(/network error/i)).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Promo re-validation on cart changes', () => {
+    const applySave20 = async () => {
+      vi.mocked(promoCodesApi.validate).mockResolvedValue({
+        code: 'SAVE20',
+        discountType: 'PERCENTAGE',
+        discountValue: 20,
+      });
+      await user.type(screen.getByPlaceholderText(/enter code/i), 'SAVE20');
+      await user.click(screen.getByRole('button', { name: /apply/i }));
+      await waitFor(() => {
+        expect(screen.getByText(/promo applied/i)).toBeInTheDocument();
+      });
+    };
+
+    it('validates against and records the first course in the cart', async () => {
+      useCartStore.getState().addItem(mockCourse1); // $49.99
+      useCartStore.getState().addItem(mockCourse2); // $79.99
+      render(<ShoppingCart />);
+
+      await applySave20();
+
+      expect(promoCodesApi.validate).toHaveBeenCalledWith('SAVE20', 'course-1');
+      // 20% of the validated course ($49.99), not of the whole cart
+      expect(screen.getByText(/saving \$10\.00/i)).toBeInTheDocument();
+    });
+
+    it('clears the promo and discount when the validated course is removed', async () => {
+      useCartStore.getState().addItem(mockCourse1);
+      useCartStore.getState().addItem(mockCourse2);
+      render(<ShoppingCart />);
+
+      await applySave20();
+      vi.mocked(promoCodesApi.validate).mockClear();
+
+      await user.click(
+        screen.getByRole('button', { name: /remove advanced tailoring techniques from cart/i }),
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByText(/promo applied/i)).not.toBeInTheDocument();
+      });
+      expect(screen.getByText(/SAVE20 was removed/i)).toBeInTheDocument();
+      expect(screen.queryByText('Discount')).not.toBeInTheDocument();
+      expect(screen.getAllByText('$79.99').length).toBeGreaterThan(0);
+      expect(promoCodesApi.validate).not.toHaveBeenCalled();
+    });
+
+    it('re-validates when another item is removed and keeps a still-valid promo', async () => {
+      useCartStore.getState().addItem(mockCourse1);
+      useCartStore.getState().addItem(mockCourse2);
+      render(<ShoppingCart />);
+
+      await applySave20();
+      vi.mocked(promoCodesApi.validate).mockClear();
+
+      await user.click(
+        screen.getByRole('button', { name: /remove professional photography from cart/i }),
+      );
+
+      await waitFor(() => {
+        expect(promoCodesApi.validate).toHaveBeenCalledWith('SAVE20', 'course-1');
+      });
+      expect(screen.getByText(/promo applied/i)).toBeInTheDocument();
+    });
+
+    it('drops the promo with a message when re-validation fails after a cart change', async () => {
+      useCartStore.getState().addItem(mockCourse1);
+      render(<ShoppingCart />);
+
+      await applySave20();
+      vi.mocked(promoCodesApi.validate).mockRejectedValue(new Error('Promo code has expired'));
+
+      act(() => {
+        useCartStore.getState().addItem(mockCourse2);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText(/promo applied/i)).not.toBeInTheDocument();
+      });
+      expect(
+        screen.getByText(/SAVE20 no longer applies to your cart: Promo code has expired/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Discount')).not.toBeInTheDocument();
     });
   });
 });

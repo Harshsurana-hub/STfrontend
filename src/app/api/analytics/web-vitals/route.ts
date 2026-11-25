@@ -12,18 +12,13 @@ export const webVitalSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  let body: unknown;
+  let payload: unknown;
   try {
-    body = await request.json();
+    payload = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const result = webVitalSchema.safeParse(body);
-  if (!result.success) {
-    return NextResponse.json({ error: 'Validation failed', details: result.error.flatten() }, { status: 400 });
-  }
-
-  console.info('[Analytics Stub]', result.data);
-  return NextResponse.json({ ok: true, received: result.data }, { status: 202 });
+  console.info('[Analytics Stub]', payload);
+  return NextResponse.json({ ok: true, received: payload }, { status: 202 });
 }

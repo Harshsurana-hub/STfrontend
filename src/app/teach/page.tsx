@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { InstructorTestimonials } from '@/components/instructor/InstructorTestimonials';
 import { useToastContext } from '@/components/ui/ToastProvider';
@@ -64,6 +64,7 @@ const STEPS = [
 export default function TeachPage() {
   const toast = useToastContext();
   const formRef = useRef<HTMLDivElement>(null);
+  const submitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -74,12 +75,22 @@ export default function TeachPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  useEffect(() => {
+    return () => {
+      if (submitTimerRef.current !== null) {
+        clearTimeout(submitTimerRef.current);
+        submitTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const scrollToForm = () => {
     formRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMsg('');
 
     if (!fullName.trim()) {
@@ -96,7 +107,8 @@ export default function TeachPage() {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
+    submitTimerRef.current = setTimeout(() => {
+      submitTimerRef.current = null;
       setIsSubmitting(false);
       setIsSubmitted(true);
       toast.success({
@@ -222,155 +234,120 @@ export default function TeachPage() {
           </div>
         </section>
 
-        {/* ── Testimonials Section ── */}
-        <section className="py-20 lg:py-28">
-          <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="mb-16 text-center">
-              <h2 className="font-display text-3xl font-extrabold text-[#26215C] sm:text-4xl">
-                Loved by Top Instructors
-              </h2>
-              <p className="mt-4 text-base text-[#5A5578]">
-                Hear from skilled creators who build their online teaching business on SorobanLard.
-              </p>
-            </div>
-
-            <InstructorTestimonials />
-          </div>
-        </section>
+        {/* ── Testimonials ── */}
+        <InstructorTestimonials />
 
         {/* ── Application Form ── */}
-        <section ref={formRef} className="bg-white py-20 lg:py-28 border-t border-[#EEEDFE]">
+        <section className="py-20 lg:py-28">
           <div className="mx-auto max-w-3xl px-6 lg:px-8">
-            <div className="rounded-3xl border border-[#D5D2F6] bg-[#FAF9FF] p-8 shadow-md sm:p-12">
+            <div ref={formRef} className="rounded-3xl border border-[#D5D2F6] bg-white p-8 shadow-sm sm:p-12">
               <div className="text-center">
-                <h2 className="font-display text-2xl font-bold text-[#26215C] sm:text-3xl">
-                  Instructor Application Form
+                <h2 className="font-display text-3xl font-extrabold text-[#26215C] sm:text-4xl">
+                  Apply to Become an Instructor
                 </h2>
-                <p className="mt-2 text-sm text-[#5A5578]">
-                  Fill out your details to apply as an instructor. Our onboarding team will review your profile.
+                <p className="mt-4 text-base text-[#5A5578]">
+                  Tell us about yourself and what you would love to teach.
                 </p>
               </div>
 
               {isSubmitted ? (
-                <div className="mt-8 rounded-2xl bg-emerald-50 p-6 text-center text-emerald-900 border border-emerald-200">
-                  <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
-                  <h3 className="mt-4 text-lg font-bold">Application Submitted!</h3>
-                  <p className="mt-2 text-sm">
-                    Thank you for applying to teach on SorobanLard. We will review your application and send instructions to your email within 48 hours.
+                <div className="mt-10 rounded-2xl border border-[#D5D2F6] bg-[#F4F2FF] p-8 text-center">
+                  <CheckCircle2 className="mx-auto h-12 w-12 text-[#7F77DD]" />
+                  <h3 className="mt-4 text-xl font-bold text-[#26215C]">Application Received</h3>
+                  <p className="mt-2 text-sm text-[#5A5578]">
+                    Thank you for applying! Our instructor review team will get back to you within 48 hours.
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-                  {errorMsg ? (
-                    <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-800 border border-rose-200">
-                      {errorMsg}
-                    </div>
-                  ) : null}
-
-                  <div className="grid gap-6 sm:grid-cols-2">
-                    <div>
-                      <label
-                        htmlFor="fullName"
-                        className="block text-sm font-semibold text-[#26215C]"
-                      >
-                        Full Name *
-                      </label>
-                      <input
-                        id="fullName"
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Amina Bello"
-                        className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-white px-4 py-3 text-sm outline-none focus:border-[#7F77DD] focus:ring-2 focus:ring-[#7F77DD]/20"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="email"
-                        className="block text-sm font-semibold text-[#26215C]"
-                      >
-                        Email Address *
-                      </label>
-                      <input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="amina@example.com"
-                        className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-white px-4 py-3 text-sm outline-none focus:border-[#7F77DD] focus:ring-2 focus:ring-[#7F77DD]/20"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-6 sm:grid-cols-2">
-                    <div>
-                      <label
-                        htmlFor="expertise"
-                        className="block text-sm font-semibold text-[#26215C]"
-                      >
-                        Area of Expertise
-                      </label>
-                      <select
-                        id="expertise"
-                        value={expertise}
-                        onChange={(e) => setExpertise(e.target.value)}
-                        className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-white px-4 py-3 text-sm outline-none focus:border-[#7F77DD] focus:ring-2 focus:ring-[#7F77DD]/20"
-                      >
-                        <option value="Tailoring & Design">Tailoring & Garment Design</option>
-                        <option value="Makeup Artistry">Makeup Artistry & Cosmetics</option>
-                        <option value="Artisanal Baking">Artisanal Baking & Pastry</option>
-                        <option value="Photography">Photography & Videography</option>
-                        <option value="Hairstyling">Hairstyling & Braids</option>
-                        <option value="Other Skills">Other Vocational Skill</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="socialLink"
-                        className="block text-sm font-semibold text-[#26215C]"
-                      >
-                        Portfolio / Social Media Link
-                      </label>
-                      <input
-                        id="socialLink"
-                        type="url"
-                        value={socialLink}
-                        onChange={(e) => setSocialLink(e.target.value)}
-                        placeholder="https://instagram.com/yourhandle"
-                        className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-white px-4 py-3 text-sm outline-none focus:border-[#7F77DD] focus:ring-2 focus:ring-[#7F77DD]/20"
-                      />
-                    </div>
+                <form onSubmit={handleSubmit} className="mt-10 space-y-6" noValidate>
+                  <div>
+                    <label htmlFor="fullName" className="block text-sm font-semibold text-[#26215C]">
+                      Full Name
+                    </label>
+                    <input
+                      id="fullName"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-[#FAF9FF] px-4 py-3 text-sm text-[#26215C] outline-none focus:border-[#7F77DD]"
+                      placeholder="e.g. Amara Okafor"
+                    />
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="motivation"
-                      className="block text-sm font-semibold text-[#26215C]"
+                    <label htmlFor="email" className="block text-sm font-semibold text-[#26215C]">
+                      Email Address
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-[#FAF9FF] px-4 py-3 text-sm text-[#26215C] outline-none focus:border-[#7F77DD]"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="expertise" className="block text-sm font-semibold text-[#26215C]">
+                      Area of Expertise
+                    </label>
+                    <select
+                      id="expertise"
+                      value={expertise}
+                      onChange={(e) => setExpertise(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-[#FAF9FF] px-4 py-3 text-sm text-[#26215C] outline-none focus:border-[#7F77DD]"
                     >
-                      Why do you want to teach on SorobanLard? *
+                      <option>Tailoring & Design</option>
+                      <option>Baking & Pastry</option>
+                      <option>Makeup Artistry</option>
+                      <option>Photography</option>
+                      <option>Crafts & Handmade</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="socialLink" className="block text-sm font-semibold text-[#26215C]">
+                      Portfolio / Social Link (optional)
+                    </label>
+                    <input
+                      id="socialLink"
+                      type="url"
+                      value={socialLink}
+                      onChange={(e) => setSocialLink(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-[#FAF9FF] px-4 py-3 text-sm text-[#26215C] outline-none focus:border-[#7F77DD]"
+                      placeholder="https://instagram.com/yourhandle"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="motivation" className="block text-sm font-semibold text-[#26215C]">
+                      What would you like to teach?
                     </label>
                     <textarea
                       id="motivation"
                       rows={4}
                       value={motivation}
                       onChange={(e) => setMotivation(e.target.value)}
-                      placeholder="Describe your teaching experience, proposed course topic, and background..."
-                      className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-white px-4 py-3 text-sm outline-none focus:border-[#7F77DD] focus:ring-2 focus:ring-[#7F77DD]/20"
-                      required
+                      className="mt-2 w-full rounded-xl border border-[#D5D2F6] bg-[#FAF9FF] px-4 py-3 text-sm text-[#26215C] outline-none focus:border-[#7F77DD]"
+                      placeholder="Describe your course idea and the skills students will gain..."
                     />
                   </div>
+
+                  {errorMsg && (
+                    <p role="alert" className="text-sm font-medium text-red-600">
+                      {errorMsg}
+                    </p>
+                  )}
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#7F77DD] py-4 text-base font-semibold text-white shadow-md transition hover:bg-[#6860C7] disabled:opacity-50"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#7F77DD] px-8 py-4 text-base font-semibold text-white shadow-lg transition duration-200 hover:bg-[#6860C7] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Send className="h-5 w-5" />
-                    {isSubmitting ? 'Submitting Application...' : 'Submit Application'}
+                    {isSubmitting ? 'Submitting...' : 'Submit Application'}
                   </button>
                 </form>
               )}
