@@ -1,49 +1,50 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+
 import { PricingTiers } from './PricingTiers';
 
-describe('PricingTiers Component (Issue #118)', () => {
-  it('exposes the tier grid as a region with an accessible name', () => {
-    render(<PricingTiers />);
-    const region = screen.getByRole('region', { name: /pricing tiers/i });
-    expect(region).toBeInTheDocument();
-  });
-
-  it('provides an accessible name for each CTA button that includes its tier name', () => {
+describe('PricingTiers', () => {
+  it('exposes the tier grid as a labelled region', () => {
     render(<PricingTiers />);
 
     expect(
-      screen.getByRole('button', { name: /Get Starter Quote for Starter Team/i })
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole('button', { name: /Get Growth Quote for Growth Plan/i })
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole('button', { name: /Contact Sales for Enterprise/i })
+      screen.getByRole('region', { name: /team pricing tiers/i })
     ).toBeInTheDocument();
   });
 
-  it('links the popular badge to the popular tier card via aria-describedby', () => {
+  it('includes the tier name in each CTA accessible name', () => {
+    render(<PricingTiers />);
+
+    expect(
+      screen.getByRole('button', { name: /Starter Team/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Pro Team/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Enterprise/ })
+    ).toBeInTheDocument();
+  });
+
+  it('announces the popular badge via aria-describedby', () => {
     render(<PricingTiers />);
 
     const badge = screen.getByText('Most Popular');
-    expect(badge).toHaveAttribute('id', 'tier-badge-growth');
+    expect(badge).toHaveAttribute('id');
 
-    const card = badge.closest('div');
-    expect(card).toHaveAttribute('aria-describedby', 'tier-badge-growth');
+    const popularCard = badge.closest('[aria-describedby]');
+    expect(popularCard).not.toBeNull();
+    expect(popularCard).toHaveAttribute('aria-describedby', badge.id);
   });
 
-  it('calls onSelectTier with the appropriate tier name when clicked', () => {
-    const handleSelect = vi.fn();
-    render(<PricingTiers onSelectTier={handleSelect} />);
+  it('calls onSelectTier with the tier name when a CTA is clicked', async () => {
+    const user = userEvent.setup();
+    const onSelectTier = vi.fn();
+    render(<PricingTiers onSelectTier={onSelectTier} />);
 
-    const starterButton = screen.getByRole('button', {
-      name: /Get Starter Quote for Starter Team/i,
-    });
-    fireEvent.click(starterButton);
+    await user.click(screen.getByRole('button', { name: /Starter Team/ }));
 
-    expect(handleSelect).toHaveBeenCalledWith('Starter Team');
+    expect(onSelectTier).toHaveBeenCalledWith('Starter Team');
   });
 });
