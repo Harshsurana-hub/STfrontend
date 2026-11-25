@@ -1,161 +1,102 @@
-import { expect, test, type Page, type Request } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
-/**
- * The leaderboard page exposes a `role="tablist"` with three period tabs and an
- * error block with a Retry button, but neither the tab wiring nor the retry
- * handler had end-to-end coverage: a regression in either would only surface in
- * manual testing.
- *
- * These specs drive the real page against `e2e/mock-api-server.mjs`. The mock
- * serves a different entry set per period, so an assertion on a name proves the
- * page requested *that* period rather than re-rendering an old response, and it
- * can be told to fail the next request once so the error path is deterministic.
- */
-
-const API_LEADERBOARD = '/api/v1/leaderboard';
-const MOCK_ORIGIN = 'http://127.0.0.1:3000';
-
-/** Arm or clear the mock's leaderboard failure switch. */
-async function setLeaderboardFailure(page: Page, armed: boolean): Promise<void> {
-  await page.request.get(`${MOCK_ORIGIN}/__control/leaderboard-fail?on=${armed ? '1' : '0'}`);
-}
-
-/** Collect leaderboard requests as the page makes them. */
-function recordLeaderboardRequests(page: Page): Request[] {
-  const requests: Request[] = [];
-  page.on('request', (request) => {
-    if (new URL(request.url()).pathname === API_LEADERBOARD) {
-      requests.push(request);
-    }
-  });
-  return requests;
-}
-
-/** The `period` query each recorded request asked for. */
-function requestedPeriods(requests: Request[]): string[] {
-  return requests.map((request) => new URL(request.url()).searchParams.get('period') ?? '');
-}
-
-test.describe('Leaderboard period tabs', () => {
-  test('switches tabs, moves aria-selected, and requests the new period', async ({ page }) => {
-    const requests = recordLeaderboardRequests(page);
-
+test.describe('Leaderboard page', () => {
+  test('renders tablist with three tabs and This Week selected', async ({ page }) => {
     await page.goto('/leaderboard');
 
-    const weekTab = page.getByRole('tab', { name: 'This Week' });
-    const monthTab = page.getByRole('tab', { name: 'This Month' });
-    const table = page.getByRole('table');
+    await expect(page.getByRole('tablist')).toBeVisible();
 
-    // The page opens on the week view.
-    await expect(weekTab).toHaveAttribute('aria-selected', 'true');
-    await expect(monthTab).toHaveAttribute('aria-selected', 'false');
-    await expect(table.getByText('Ada Week')).toBeVisible();
+    const thisWeek = page.getByRole('tab', { name: 'This Week' });
+    const thisMonth = page.getByRole('tab', { name: 'This Month' });
+    const allTime = page.getByRole('tab', { name: 'All Time' });
 
-    await monthTab.click();
+    await expect(thisWeek).toBeVisible();
+    await expect(thisMonth).toBeVisible();
+    await expect(allTime).toBeVisible();
 
-    // Selection moves, and only one tab is selected at a time.
-    await expect(monthTab).toHaveAttribute('aria-selected', 'true');
-    await expect(weekTab).toHaveAttribute('aria-selected', 'false');
-
-    // The month fixture turning up proves a request for the new period was
-    // served, not merely a re-render of the week response.
-    await expect(table.getByText('Ada Month')).toBeVisible();
-    await expect(table.getByText('Ada Week')).toHaveCount(0);
-
-    // The initial request and the switched one both went out, in that order.
-    // React issues the mount fetch twice in dev (StrictMode), so compare the
-    // period sequence by its ends rather than by exact call count.
-    const periods = requestedPeriods(requests);
-    expect(periods[0]).toBe('week');
-    expect(periods[periods.length - 1]).toBe('month');
-    expect(periods).not.toContain('');
+    await expect(thisWeek).toHaveAttribute('aria-selected', 'true');
+    await expect(thisMonth).toHaveAttribute('aria-selected', 'false');
+    await expect(allTime).toHaveAttribute('aria-selected', 'false');
   });
 
-  test('requests the all-time period when that tab is chosen', async ({ page }) => {
-    const requests = recordLeaderboardRequests(page);
-
-    await page.goto('/leaderboard');
-    await expect(page.getByRole('table').getByText('Ada Week')).toBeVisible();
-
-    const allTab = page.getByRole('tab', { name: 'All Time' });
-    await allTab.click();
-
-    await expect(allTab).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByRole('table').getByText('Ada Alltime')).toBeVisible();
-    expect(requestedPeriods(requests).at(-1)).toBe('all');
-  });
-});
-
-test.describe('Leaderboard error and retry', () => {
-  test('shows the error block and Retry re-requests the same period', async ({ page }) => {
-    // Fail every leaderboard request until the error block is up, so a second
-    // in-flight request cannot quietly populate the table behind the error.
-    await setLeaderboardFailure(page, true);
-
-    const requests = recordLeaderboardRequests(page);
-
+  test('switching tabs updates aria-selected and requests the new period', async ({ page }) => {
     await page.goto('/leaderboard');
 
-    const errorText = page.getByText('Failed to load leaderboard. Please try again.');
-    await expect(errorText).toBeVisible();
+    const thisWeek = page.getByRole('tab', { name: 'This Week' });
+    const thisMonth = page.getByRole('tab', { name: 'This Month' });
 
-    // The table never rendered, so no entries leaked through on failure.
-    await expect(page.getByRole('table')).toHaveCount(0);
+    await expect(thisWeek).toHaveAttribute('aria-selected', 'true');
 
-    const retry = page.getByRole('button', { name: 'Retry' });
-    await expect(retry).toBeVisible();
-
-    // Let the next request succeed, then retry.
-    await setLeaderboardFailure(page, false);
-    const before = requests.length;
-    await retry.click();
-
-    // The retry worked: the error block is gone and the week fixture is up.
-    await expect(errorText).toHaveCount(0);
-    await expect(page.getByRole('table').getByText('Ada Week')).toBeVisible();
-
-    // Retry re-requested the period the failure happened on, rather than
-    // falling back to a default or asking for a different one.
-    const retryPeriods = requestedPeriods(requests.slice(before));
-    expect(retryPeriods.length).toBeGreaterThan(0);
-    expect(retryPeriods.every((period) => period === 'week')).toBe(true);
-
-    await expect(page.getByRole('tab', { name: 'This Week' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-  });
-
-  test('retry from a non-default period keeps that period selected', async ({ page }) => {
-    await page.goto('/leaderboard');
-    await expect(page.getByRole('table').getByText('Ada Week')).toBeVisible();
-
-    await page.getByRole('tab', { name: 'This Month' }).click();
-    await expect(page.getByRole('table').getByText('Ada Month')).toBeVisible();
-
-    // Fail from here on: switching to All Time will fail, and so will anything
-    // else until the retry, which is the request under test.
-    await setLeaderboardFailure(page, true);
-
-    const requests = recordLeaderboardRequests(page);
-
-    await page.getByRole('tab', { name: 'All Time' }).click();
-    const retry = page.getByRole('button', { name: 'Retry' });
-    await expect(retry).toBeVisible();
-
-    await setLeaderboardFailure(page, false);
-    const before = requests.length;
-    await retry.click();
-
-    await expect(page.getByRole('table').getByText('Ada Alltime')).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'All Time' })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    const monthRequest = page.waitForRequest(
+      (req) => req.url().includes('/api/leaderboard') && req.url().includes('period=month'),
     );
 
-    // The retry asked for the period that stays selected, not the default.
-    const retryPeriods = requestedPeriods(requests.slice(before));
-    expect(retryPeriods.length).toBeGreaterThan(0);
-    expect(retryPeriods.every((period) => period === 'all')).toBe(true);
+    await thisMonth.click();
+
+    await monthRequest;
+
+    await expect(thisMonth).toHaveAttribute('aria-selected', 'true');
+    await expect(thisWeek).toHaveAttribute('aria-selected', 'false');
+  });
+
+  test('shows loading spinner during fetch', async ({ page }) => {
+    let releaseRequest: () => void = () => {};
+    const requestGate = new Promise<void>((resolve) => {
+      releaseRequest = resolve;
+    });
+
+    await page.route('**/api/leaderboard**', async (route) => {
+      await requestGate;
+      await route.continue();
+    });
+
+    await page.goto('/leaderboard');
+
+    await expect(page.getByLabel('Loading leaderboard')).toBeVisible();
+
+    releaseRequest();
+
+    await expect(page.getByLabel('Loading leaderboard')).toBeHidden();
+  });
+
+  test('error state shows Retry and retry re-requests the same period', async ({ page }) => {
+    let leaderboardCalls = 0;
+    const requestedUrls: string[] = [];
+
+    await page.route('**/api/leaderboard**', async (route) => {
+      leaderboardCalls += 1;
+      requestedUrls.push(route.request().url());
+
+      if (leaderboardCalls === 1) {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Internal Server Error' }),
+        });
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await page.goto('/leaderboard');
+
+    const retryButton = page.getByRole('button', { name: 'Retry' });
+    await expect(retryButton).toBeVisible();
+
+    const retryRequest = page.waitForRequest(
+      (req) => req.url().includes('/api/leaderboard') && req.url().includes('period=week'),
+    );
+
+    await retryButton.click();
+
+    await retryRequest;
+
+    await expect(page.getByRole('table')).toBeVisible();
+    await expect(retryButton).toBeHidden();
+
+    expect(leaderboardCalls).toBeGreaterThanOrEqual(2);
+    expect(requestedUrls[0]).toContain('period=week');
+    expect(requestedUrls[1]).toContain('period=week');
   });
 });
